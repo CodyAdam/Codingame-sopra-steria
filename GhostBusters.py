@@ -8,8 +8,12 @@ class Vec2:
         self.x = int(x)
         self.y = int(y)
 
-    def getOpposite(self):
+    def opposite(self):
         return (16000 - self.x, 9000 - self.y)
+
+    def dist(self, other):
+        return Math.sqrt(
+            Math.pow(self.x - other.x, 2) + Math.pow(self.y - other.y))
 
     def __str__(self):
         return "({x}, {y})".format(x=str(self.x), y=str(self.y))
@@ -55,36 +59,57 @@ class Ghost(Entity):
 
 
 class Unit(Entity):
-    def __init__(self):
+    def __init__(self, isAlly):
         super().__init__()
+        self.isAlly = isAlly
+        self.basePos = entities.allies.getBasePos(
+        ) if isAlly else entities.enemies.getBasePos()
 
 
 class Support(Unit):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, isAlly):
+        super().__init__(isAlly)
 
 
 class Catcher(Unit):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, isAlly):
+        super().__init__(isAlly)
+
+    def getNextMove(self):
+        if state == 1:
+            return
+        elif state == 4:
+            return
+        else:  #nothing
+            return
+            #TODO do implementation
+        print(entities.ghost_count, file=sys.stderr, flush=True)
 
 
 class Hunter(Unit):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, isAlly):
+        super().__init__(isAlly)
 
 
 class Team:
-    def __init__(self):
-        self.hunter = Hunter()
-        self.catcher = Catcher()
-        self.support = Support()
+    def __init__(self, isAlly):
+        self.hunter = Hunter(isAlly)
+        self.catcher = Catcher(isAlly)
+        self.support = Support(isAlly)
+        self.isAlly = isAlly
         self.units = [self.hunter, self.catcher, self.support]
 
     def updateNotSeen(self):
         self.hunter.updateNotSeen()
         self.catcher.updateNotSeen()
         self.support.updateNotSeen()
+
+    def getBasePos(self):
+        if (self.isAlly and entities.my_team_id == 0) or (
+                not self.isAlly and entities.my_team_id == 1):
+            return Vec2(0, 0)
+        else:
+            return Vec2(0, 0).opposite()
 
     def __str__(self):
         prefix = "   "
@@ -102,8 +127,8 @@ class Entities:
         self.ghost_count = ghost_count
         self.my_team_id = my_team_id
 
-        self.allies = Team()
-        self.enemies = Team()
+        self.allies = Team(True)
+        self.enemies = Team(False)
         self.ghosts = [Ghost() for g in range(ghost_count)]
 
     def update(self, entities_count):
@@ -184,3 +209,5 @@ while True:
     print("MOVE 4000 4500")
     print("MOVE 12000 4500")
     print("MOVE 8000 4500")
+
+    entities.allies.catcher.getNextMove()
