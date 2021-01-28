@@ -5,44 +5,40 @@ import random
 
 W = 16000
 H = 9000
+TILE = 1000
 
 
 def update(entities_count):
-
-    # Increse the not_seen timer for all entities
-    allies.updateNotSeen()
-    enemies.updateNotSeen()
-    for g in ghosts:
-        g.updateNotSeen()
+    for g in visible:
+        g.updated = False
 
     for i in range(entities_count):
         entity_id, x, y, entity_type, entity_role, state, value = [
             int(j) for j in input().split()
         ]
-        # entity_type: the team id if it is a buster, -1 if it is a ghost.
-        # entity_role: -1 for ghosts, 0 for the HUNTER, 1 for the GHOST CATCHER and 2 for the SUPPORT
-        # entity_id: buster id or ghost id
-        # x,y: position of this buster / ghost
-        # state: For busters: 0=idle, 1=carrying a ghost. For ghosts: remaining hp.
-        # value: For busters: Ghost id carried/busted or number of turns left when stunned.
-        #                     For ghosts: number of busters attempting to trap this ghost.
-
-        if entity_type == -1:
-            ghosts[entity_id].update(Vec2(x, y), state, value, entity_id)
-        elif entity_type == my_team_id:
+        if entity_type == my_team_id:
             if entity_role == 0:
-                allies.hunter.update(Vec2(x, y), state, value, entity_id)
+                hunter.update(Vec2(x, y), state, value, entity_id)
             elif entity_role == 1:
-                allies.catcher.update(Vec2(x, y), state, value, entity_id)
+                catcher.update(Vec2(x, y), state, value, entity_id)
             elif entity_role == 2:
-                allies.support.update(Vec2(x, y), state, value, entity_id)
+                support.update(Vec2(x, y), state, value, entity_id)
         else:
-            if entity_role == 0:
-                enemies.hunter.update(Vec2(x, y), state, value, entity_id)
-            elif entity_role == 1:
-                enemies.catcher.update(Vec2(x, y), state, value, entity_id)
-            elif entity_role == 2:
-                enemies.support.update(Vec2(x, y), state, value, entity_id)
+            if entity_role == -1:
+                found = False
+                for g in visible:
+                    if g.id == entity_id:
+                        g.update(Vec2(x, y), state, value, entity_id)
+                        found = True
+                        break
+                if not found:
+                    new = Ghost()
+                    new.update(Vec2(x, y), state, value, entity_id)
+                    visible.add(new)
+
+    for g in visible.copy():
+        if not g.updated:
+            visible.remove(g)
 
 
 def allToString():
@@ -91,8 +87,13 @@ class Vec2:
         return Vec2(self.x / value, self.y / value)
 
     def dist(self, other):
-        return math.sqrt(
-            math.pow(self.x - other.x, 2) + math.pow(self.y - other.y, 2))
+        return math.sqrt(pow(self.x - other.x, 2) + pow(self.y - other.y, 2))
+
+    def toGrid(self):
+        return Vec2(self.x / TILE, self.y / TILE)
+
+    def toFrame(self):
+        return Vec2(self.x * TILE, self.y * TILE)
 
     def __str__(self):
         return "{x} {y}".format(x=str(self.x), y=str(self.y))
@@ -100,60 +101,33 @@ class Vec2:
 
 class Entity:
     def __init__(self):
-        self.entity_id = None
-        self.entity_type = None
-        self.entity_role = None
+        self.id = None
+        self.type = None
+        self.role = None
         self.pos = None
         self.state = None
         self.value = None
-        self.last_seen = None
+        self.updated = False
 
     def update(self, pos, state, value, entity_id, entity_type, entity_role):
-        self.entity_id = entity_id
-        self.entity_type = entity_type
-        self.entity_role = entity_role
+        self.id = entity_id
+        self.type = entity_type
+        self.role = entity_role
         self.pos = Vec2(pos.x, pos.y)
         self.state = state
         self.value = value
-        self.last_seen = 0
-
-    def updateNotSeen(self):
-        if (self.last_seen != None):
-            self.last_seen += 1
+        self.updated = True
 
     def __str__(self):
         prefix = "      "
         suffix = "\n"
         string = "\n"
-        string += prefix + "id: " + str(self.entity_id) + suffix
-        string += prefix + "type: " + str(self.entity_type) + suffix
-        string += prefix + "role: " + str(self.entity_role) + suffix
+        string += prefix + "id: " + str(self.id) + suffix
+        string += prefix + "type: " + str(self.type) + suffix
+        string += prefix + "role: " + str(self.role) + suffix
         string += prefix + "pos: " + str(self.pos) + suffix
         string += prefix + "state: " + str(self.state) + suffix
         string += prefix + "value: " + str(self.value) + suffix
-        string += prefix + "last_seen: " + str(self.last_seen) + suffix
-        return string
-
-
-class Team:
-    def __init__(self, isAlly):
-        self.hunter = Hunter(isAlly)
-        self.catcher = Catcher(isAlly)
-        self.support = Support(isAlly)
-        self.units = [self.hunter, self.catcher, self.support]
-
-    def updateNotSeen(self):
-        self.hunter.updateNotSeen()
-        self.catcher.updateNotSeen()
-        self.support.updateNotSeen()
-
-    def __str__(self):
-        prefix = "   "
-        suffix = "\n"
-        string = "\n"
-        string += prefix + "hunter: " + str(self.hunter) + suffix
-        string += prefix + "catcher: " + str(self.catcher) + suffix
-        string += prefix + "support: " + str(self.support) + suffix
         return string
 
 
@@ -162,7 +136,12 @@ class Ghost(Entity):
         super().__init__()
 
     def __eq__(self, other):
-        self.entity_id == other.entity_id
+        if other == None:
+            return False
+        return self.id == other.id
+
+    def __hash__(self):
+        return hash(self.id)
 
     def update(self, pos, state, value, entity_id):
         super().update(pos, state, value, entity_id, -1, -1)
@@ -173,24 +152,19 @@ class Unit(Entity):
         super().__init__()
         self.isAlly = isAlly
         self.basePos = self.getBasePos()
+        self.viewDist = 2200
 
-    def update(self, pos, state, value, entity_id, entity_type, entity_role):
-        if value != 0:
-            ghosts[value].carried = True
-        return super().update(pos, state, value, entity_id, entity_type,
-                              entity_role)
-
-    def getNearestGhost(self):
-        dist = None
-        ghost = None
-        for g in ghosts:
-            if g.last_seen == None:
-                continue
-            d = self.pos.dist(g.pos) + g.last_seen * 20
-            if dist == None or d < dist:
-                dist = d
-                ghost = g
-        return ghost
+    # def getNearestGhost(self):
+    #     dist = None
+    #     ghost = None
+    #     for g in ghosts:
+    #         if g.last_seen == None:
+    #             continue
+    #         d = self.pos.dist(g.pos) + g.last_seen * 20
+    #         if dist == None or d < dist:
+    #             dist = d
+    #             ghost = g
+    #     return ghost
 
     def getBasePos(self):
         if (self.isAlly and my_team_id == 0) or (not self.isAlly
@@ -219,31 +193,35 @@ class Catcher(Unit):
         super().__init__(isAlly)
 
     def getNextMove(self):
-        out = ""
-        if self.state == 1:  # carry a ghost
-            if self.pos.dist(self.basePos) >= 1600:  # in base range
-                out = "MOVE {x} {y}".format(x=self.basePos.x, y=self.basePos.y)
-            else:
-                ghosts[self.value].last_seen = None
-                out = "RELEASE"
-        else:  # carry nothing || stun || TRAPING
-            nearestGhost = self.getNearestGhost()
-            if nearestGhost != None:
-                if self.pos.dist(nearestGhost.pos) > 1760:
-                    out = "MOVE {x} {y}".format(x=nearestGhost.pos.x,
-                                                y=nearestGhost.pos.y)
-                else:
-                    if self.pos.dist(nearestGhost.pos) < 900:
-                        backward = (nearestGhost.pos -
-                                    self.pos).normalized().invert()
-                        out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
-                    else:
-                        print(nearestGhost, file=sys.stderr, flush=True)
-                        out = "TRAP {id}".format(id=nearestGhost.entity_id)
-            else:
-                randomPos = Vec2(random.randint(0, W), random.randint(0, H))
-                out = "MOVE {x} {y}".format(x=randomPos.x, y=randomPos.y)
+        out = "MOVE " + str(self.basePos)
         return out
+
+    # def getNextMove(self):
+    #     out = ""
+    #     if self.state == 1:  # carry a ghost
+    #         if self.pos.dist(self.basePos) >= 1600:  # in base range
+    #             out = "MOVE {x} {y}".format(x=self.basePos.x, y=self.basePos.y)
+    #         else:
+    #             ghosts[self.value].last_seen = None
+    #             out = "RELEASE"
+    #     else:  # carry nothing || stun || TRAPING
+    #         nearestGhost = self.getNearestGhost()
+    #         if nearestGhost != None:
+    #             if self.pos.dist(nearestGhost.pos) > 1760:
+    #                 out = "MOVE {x} {y}".format(x=nearestGhost.pos.x,
+    #                                             y=nearestGhost.pos.y)
+    #             else:
+    #                 if self.pos.dist(nearestGhost.pos) < 900:
+    #                     backward = (nearestGhost.pos -
+    #                                 self.pos).normalized().invert()
+    #                     out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
+    #                 else:
+    #                     print(nearestGhost, file=sys.stderr, flush=True)
+    #                     out = "TRAP {id}".format(id=nearestGhost.entity_id)
+    #         else:
+    #             randomPos = Vec2(random.randint(0, W), random.randint(0, H))
+    #             out = "MOVE {x} {y}".format(x=randomPos.x, y=randomPos.y)
+    #     return out
 
     def update(self, pos, state, value, entity_id):
         super().update(pos, state, value, entity_id,
@@ -257,24 +235,29 @@ class Hunter(Unit):
 
     def getNextMove(self):
         out = ""
-        if (True):  # carry nothing || STUN || busting
-            nearestGhost = self.getNearestGhost()
-            if nearestGhost != None:
-                if self.pos.dist(nearestGhost.pos) > 1760:
-                    out = "MOVE {x} {y}".format(x=nearestGhost.pos.x,
-                                                y=nearestGhost.pos.y)
-                else:
-                    if self.pos.dist(nearestGhost.pos) < 900:
-                        backward = (nearestGhost.pos -
-                                    self.pos).normalized().invert()
-                        out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
-                    else:
-                        print(nearestGhost, file=sys.stderr, flush=True)
-                        out = "BUST {id}".format(id=nearestGhost.entity_id)
+
+        target = self.getOptimalGhost()
+        if (target != None):
+            if self.pos.dist(target.pos) > 1760:
+                out = "MOVE {x} {y}".format(x=target.pos.x, y=target.pos.y)
             else:
-                randomPos = Vec2(random.randint(0, W), random.randint(0, H))
-                out = "MOVE {x} {y}".format(x=randomPos.x, y=randomPos.y)
+                if self.pos.dist(target.pos) < 900:
+                    backward = (target.pos - self.pos).normalized().invert()
+                    out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
+                else:
+                    print(target, file=sys.stderr, flush=True)
+                    out = "BUST {id}".format(id=target.id)
+                    if target.state == 1:
+                        heat_alive.removeOne()
+        else:
+            targetPos = heat_alive.getMaxPos()
+            out = "MOVE {x} {y}".format(x=targetPos.x, y=targetPos.y)
         return out
+
+    def getOptimalGhost(self):
+        for e in visible:
+            if e.state > 0:
+                return e
 
     def update(self, pos, state, value, entity_id):
         super().update(pos, state, value, entity_id,
@@ -283,8 +266,70 @@ class Hunter(Unit):
 
 
 class HeatMap():
-    def __init__(self):
-        super().__init__()
+    def __init__(self, number, matching_type, matching_role):
+        self.width = int(W / TILE) + 1
+        self.height = int(H / TILE) + 1
+        self.number = number
+        self.matching_type = -1
+        self.matching_role = -1
+        self.size = self.width * self.height
+        self.heat = [[float(number / self.size) for i in range(self.width)]
+                     for j in range(self.height)]
+
+    def update(self):
+        self.clear(hunter.pos, hunter.viewDist)
+        self.clear(catcher.pos, catcher.viewDist)
+        self.clear(support.pos, support.viewDist)
+        self.updateHeat()
+
+    def getMaxPos(self):
+        current_max = 0
+        max_pos = None
+        for y in range(self.height):
+            for x in range(self.width):
+                if current_max < self.heat[y][x]:
+                    current_max = self.heat[y][x]
+                    max_pos = Vec2(x, y).toFrame()
+        return max_pos
+
+    def increment(self, value):
+        for y in range(self.height):
+            for x in range(self.width):
+                self.heat[y][x] += value
+                if self.heat[y][x] < 0:
+                    self.heat[y][x] = 0
+
+    def removeOne(self):
+        self.number -= 1
+        self.increment(-1 / self.size)
+
+    def updateHeat(self):
+        for e in visible:
+            if e.type == self.matching_type and e.role == self.matching_role:
+                if self.matching_type != -1 or (self.matching_type == -1
+                                                and e.state > 0):
+                    in_grid = e.pos.toGrid()
+                    self.increment(-1 / self.size)
+                    self.heat[in_grid.y][in_grid.x] += 1
+
+    def clear(self, pos, viewDist):
+        for y in range(self.height):
+            for x in range(self.width):
+                current = Vec2(x, y).toFrame()
+                if pos.dist(current) < viewDist:
+                    self.increment(self.heat[y][x] / self.size)
+                    self.heat[y][x] = 0.0
+
+    def __str__(self):
+        string = ""
+        total = 0.0
+        for y in range(self.height):
+            for x in range(self.width):
+                total += self.heat[y][x]
+                string += str(round(self.heat[y][x] * 10) / 10) + " "
+            string += "\n"
+
+        return string + "\n" + str(total)
 
 
 # Phase 1 : SUPP stun HUNTER && CATCHER scout && HUNTER damage
@@ -292,27 +337,27 @@ class HeatMap():
 
 phase = 1
 turn = 0
-
 busters_per_player = int(input())  # amount of busters you control
 ghost_count = int(input())  # amount of ghosts on the map
 my_team_id = int(input())  # 0 : base is top left || 1 : on the bottom right
 
-allies = Team(True)
-enemies = Team(False)
-ghosts = [Ghost() for g in range(ghost_count)]
+hunter = Hunter(True)
+catcher = Catcher(True)
+support = Support(True)
+visible = set()
+heat_alive = HeatMap(ghost_count, -1, -1)
 
 # game loop
 while True:
     turn += 1
-    entities_count = int(input())
-    update(entities_count)
-
+    update(int(input()))
+    heat_alive.update()
+    print(heat_alive, file=sys.stderr, flush=True)
     # print(allToString(), file=sys.stderr, flush=True)
 
     # First the HUNTER : MOVE x y | BUST id
     # Second the GHOST CATCHER: MOVE x y | TRAP id | RELEASE
     # Third the SUPPORT: MOVE x y | STUN id | RADAR
-
-    print(allies.hunter.getNextMove())
-    print(allies.catcher.getNextMove())
-    print(allies.support.getNextMove())
+    print(hunter.getNextMove())
+    print(catcher.getNextMove())
+    print(support.getNextMove())
