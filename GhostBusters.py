@@ -284,11 +284,12 @@ class HeatMap():
 
     def getMaxPos(self):
         current_max = 0
+        blured = self.gaussBlur(self.heat, 3, 0.1)
         max_pos = None
         for y in range(self.height):
             for x in range(self.width):
-                if current_max < self.heat[y][x]:
-                    current_max = self.heat[y][x]
+                if current_max < blured[y][x]:
+                    current_max = blured[y][x]
                     max_pos = Vec2(x, y).toFrame()
         return max_pos
 
@@ -298,6 +299,34 @@ class HeatMap():
                 self.heat[y][x] += value
                 if self.heat[y][x] < 0:
                     self.heat[y][x] = 0
+
+    def gaussBlur(self, input, filterSize, sigma):
+        gaussfilter = [[
+            (1 / (sigma * math.sqrt(2 * math.pi))) *
+            (math.exp(-((i - math.ceil(filterSize / 2))**2 +
+                        (j - math.ceil(filterSize / 2))**2 / 2 * sigma**2)))
+            for i in range(filterSize)
+        ] for j in range(filterSize)]
+
+        out = [[0.0 for k in range(self.width)] for l in range(self.height)]
+
+        for x in range(self.width):
+            for y in range(self.height):
+                for i in range(filterSize):
+                    for j in range(filterSize):
+                        cx = int(x + i - int(filterSize / 2))
+                        cy = int(y + j - int(filterSize / 2))
+                        if cx >= 0 and cx < self.width and cy >= 0 and cy < self.height:
+
+                            out[y][x] = out[y][x] + float(
+                                gaussfilter[i][j] * input[cy][cx])
+                # print("x={x} y={y}  maxX={w}  maxY={h}".format(x=x,
+                #                                                y=y,
+                #                                                w=self.width,
+                #                                                h=self.height),
+                #       file=sys.stderr,
+                #       flush=True)
+        return out
 
     def removeOne(self):
         self.number -= 1
@@ -323,10 +352,12 @@ class HeatMap():
     def __str__(self):
         string = ""
         total = 0.0
+        gauss = self.gaussBlur(self.heat, 3, 0.1)
         for y in range(self.height):
             for x in range(self.width):
                 total += self.heat[y][x]
-                string += str(round(self.heat[y][x] * 10) / 10) + " "
+                # string += str(round(self.heat[y][x] * 10000) / 10000) + " "
+                string += str(round(gauss[y][x])) + " "
             string += "\n"
 
         return string + "\n" + str(total)
