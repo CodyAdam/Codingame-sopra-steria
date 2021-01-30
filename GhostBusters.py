@@ -74,6 +74,9 @@ class Vec2:
     def norm(self):
         return self.dist(Vec2(0, 0))
 
+    def get(self):
+        return (self.x, self.y)
+
     def __add__(self, other):
         return Vec2(self.x + other.x, self.y + other.y)
 
@@ -285,7 +288,7 @@ class HeatMap():
 
     def getMaxPos(self):
         current_max = 0
-        blured = self.gaussBlur(self.heat, 3, 0.1, 0.4)
+        blured = self.addProximity(self.gaussBlur())
         max_pos = None
         for y in range(self.height):
             for x in range(self.width):
@@ -298,30 +301,50 @@ class HeatMap():
         for y in range(self.height):
             for x in range(self.width):
                 self.heat[y][x] += value
-                if self.heat[y][x] < 0:
-                    self.heat[y][x] = 0
 
-    def gaussBlur(self, input, filterSize, sigma, proximity, proximityPos):
-        gaussfilter = [[
-            (1 / (sigma * math.sqrt(2 * math.pi))) *
-            (math.exp(-((i - math.ceil(filterSize / 2))**2 +
-                        (j - math.ceil(filterSize / 2))**2 / 2 * sigma**2)))
-            for i in range(filterSize)
-        ] for j in range(filterSize)]
+    def gaussBlur(self):
+        F_SIZE = 7
+        SIGMA = 2
+        main_filter = self.gaussFilter(F_SIZE, SIGMA)
 
         out = [[0.0 for k in range(self.width)] for l in range(self.height)]
 
         for x in range(self.width):
             for y in range(self.height):
-                for i in range(filterSize):
-                    for j in range(filterSize):
-                        cx = int(x + i - int(filterSize / 2))
-                        cy = int(y + j - int(filterSize / 2))
+                for i in range(F_SIZE):
+                    for j in range(F_SIZE):
+                        cx = int(x + i - int(F_SIZE / 2))
+                        cy = int(y + j - int(F_SIZE / 2))
                         if cx >= 0 and cx < self.width and cy >= 0 and cy < self.height:
-                            out[y][x] = out[y][x] + float(
-                                gaussfilter[i][j] * input[cy][cx])
-                out[y][x] = out[y][x] + 1 / (
-                    Vec2(x, y).dist(self.unit.pos.toGrid) * proximity)
+                            out[y][x] += main_filter[i][j] * self.heat[cy][cx]
+        return out
+
+    def addProximity(self, arr):
+        P_SIZE = 7
+        POWER = 0.4
+        SIGMA = 5
+        proximity_filter = self.gaussFilter(P_SIZE, SIGMA)
+
+        x, y = self.unit.pos.toGrid().get()
+        out = arr.copy()
+        for i in range(P_SIZE):
+            for j in range(P_SIZE):
+                cx = int(x + i - int(P_SIZE / 2))
+                cy = int(y + j - int(P_SIZE / 2))
+                if cx >= 0 and cx < self.width and cy >= 0 and cy < self.height:
+                    out[cy][cx] += proximity_filter[i][j] * POWER
+        return out
+
+    def gaussFilter(self, size, sigma):
+        out = [[0.0 for k in range(size)] for l in range(size)]
+        for i in range(int(-(size) / 2), int((size) / 2) + 1):
+            for j in range(int(-(size) / 2), int((size) / 2) + 1):
+                x0 = int((size) / 2)
+                y0 = int((size) / 2)
+                x = i + x0
+                y = j + y0
+                out[y][x] = math.exp(-((x - x0)**2 + (y - y0)**2) / 2 / sigma /
+                                     sigma)
         return out
 
     def removeOne(self):
@@ -346,16 +369,27 @@ class HeatMap():
                     self.heat[y][x] = 0.0
 
     def __str__(self):
-        string = ""
+
+        string = "im1 = ["
         total = 0.0
-        gauss = self.gaussBlur(self.heat, 3, 0.1, 0.4)
+        gauss = self.gaussBlur()
         for y in range(self.height):
             for x in range(self.width):
                 total += self.heat[y][x]
-                # string += str(round(self.heat[y][x] * 10000) / 10000) + " "
-                string += str(round(gauss[y][x])) + " "
-            string += "\n"
-
+                string += str(round(gauss[y][x] * 10000) / 10000) + " "
+            string += ";\n"
+        string += "];\n im2=["
+        gauss2 = self.addProximity(self.gaussBlur())
+        for y in range(self.height):
+            for x in range(self.width):
+                string += str(round(gauss2[y][x] * 10000) / 10000) + " "
+            string += ";\n "
+        string += "]; \nim3=["
+        for y in range(self.height):
+            for x in range(self.width):
+                string += str(round(self.heat[y][x] * 10000) / 10000) + " "
+            string += ";\n"
+        string += "];\n"
         return string + "\n" + str(total)
 
 
@@ -372,14 +406,15 @@ hunter = Hunter(True)
 catcher = Catcher(True)
 support = Support(True)
 visible = set()
-heat_alive = HeatMap(ghost_count, -1, -1)
+heat_alive = HeatMap(ghost_count, -1, -1, hunter)
 
 # game loop
 while True:
     turn += 1
     update(int(input()))
     heat_alive.update()
-    print(heat_alive, file=sys.stderr, flush=True)
+    if turn >= 100:
+        print(heat_alive, file=sys.stderr, flush=True)
     # print(allToString(), file=sys.stderr, flush=True)
 
     # First the HUNTER : MOVE x y | BUST id
