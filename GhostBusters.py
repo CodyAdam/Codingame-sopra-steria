@@ -170,18 +170,6 @@ class Unit(Entity):
         self.basePos = self.getBasePos()
         self.viewDist = 2200
 
-    # def getNearestGhost(self):
-    #     dist = None
-    #     ghost = None
-    #     for g in ghosts:
-    #         if g.last_seen == None:
-    #             continue
-    #         d = self.pos.dist(g.pos) + g.last_seen * 20
-    #         if dist == None or d < dist:
-    #             dist = d
-    #             ghost = g
-    #     return ghost
-
     def getBasePos(self):
         if (self.isAlly and my_team_id == 0) or (not self.isAlly
                                                  and my_team_id == 1):
@@ -200,19 +188,31 @@ class Support(Unit):
         out = ""
         target = self.getTarget()
         if (target != None):
-            if self.pos.dist(target.pos) > 1760:
-                out = "MOVE {x} {y}".format(x=target.pos.x, y=target.pos.y)
-            else:
-                if self.cooldown <= 0 and target.state != 0:
-                    out = "STUN {id}".format(id=target.id)
-                    self.cooldown = 20
+            if self.pos.dist(
+                    target.pos
+            ) > 1760 or self.cooldown > 0 or target.state == 0:
+                close = self.getCloseDead()
+                if close != None:
+                    offset = (close.pos - self.basePos).normalized() * 10
+                    out = "MOVE {x} {y} 🤚".format(x=close.pos.x + offset.x,
+                                                  y=close.pos.y + offset.y)
                 else:
-                    out = "MOVE {x} {y}".format(x=target.pos.x, y=target.pos.y)
+                    out = "MOVE {x} {y} 🔫{cd}".format(
+                        x=target.pos.x,
+                        y=target.pos.y,
+                        cd=(self.cooldown if self.cooldown > 0 else ""))
+            else:
+                out = "STUN {id} STUN".format(id=target.id)
+                self.cooldown = 20
         else:
-            print("NOT FOUND ??", file=sys.stderr, flush=True)
             targetPos = heat_catcher.getMaxPos()
-            out = "MOVE {x} {y}".format(x=targetPos.x, y=targetPos.y)
+            out = "MOVE {x} {y} 🔍".format(x=targetPos.x, y=targetPos.y)
         return out
+
+    def getCloseDead(self):
+        for e in visible:
+            if e.type == -1 and e.state == 0 and e.pos.dist(self.pos) < 1100:
+                return e
 
     def getTarget(self):
         for e in visible:
@@ -237,30 +237,33 @@ class Catcher(Unit):
         out = ""
         if self.state == 1:  # carry a ghost
             if self.pos.dist(self.basePos) >= 1600:  # in base range
-                out = "MOVE {x} {y}".format(x=self.basePos.x, y=self.basePos.y)
+                out = "MOVE {x} {y} 🏠".format(x=self.basePos.x,
+                                              y=self.basePos.y)
             else:
-                out = "RELEASE"
+                out = "RELEASE RELEASE"
+                heat_dead.removeOne()
         else:  # carry nothing || stun || TRAPING
             target = self.getOptimalGhost()
             if (target != None):
                 if self.pos.dist(target.pos) > 1760:
-                    out = "MOVE {x} {y}".format(x=target.pos.x, y=target.pos.y)
+                    out = "MOVE {x} {y} 👀".format(x=target.pos.x,
+                                                  y=target.pos.y)
                 else:
                     if self.pos.dist(target.pos) < 900:
                         backward = (target.pos -
                                     self.pos).normalized().invert()
-                        out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
+                        out = "MOVE {x} {y} 🥾".format(x=backward.x,
+                                                      y=backward.y)
                     else:
                         if target.state == 0:
                             # print(target, file=sys.stderr, flush=True)
-                            out = "TRAP {id}".format(id=target.id)
-                            heat_dead.removeOne()
+                            out = "TRAP {id} TRAP".format(id=target.id)
                         else:
-                            out = "MOVE {x} {y}".format(x=self.pos.x,
-                                                        y=self.pos.y)
+                            out = "MOVE {x} {y} ⏲".format(x=self.pos.x,
+                                                          y=self.pos.y)
             else:
                 targetPos = heat_dead.getMaxPos()
-                out = "MOVE {x} {y}".format(x=targetPos.x, y=targetPos.y)
+                out = "MOVE {x} {y} 🔍".format(x=targetPos.x, y=targetPos.y)
         return out
 
     def getOptimalGhost(self):
@@ -294,24 +297,45 @@ class Hunter(Unit):
     def getNextMove(self):
         out = ""
         target = self.getOptimalGhost()
-        if (target != None):
+        dead = self.getDeadGhost()
+        if ((catcher.state == 2 or catcher.state == 1
+             or catcher.pos.dist(self.pos) > 4000) and dead != None):
+            #PUSH
+            target = dead
+            offset = (target.pos - self.basePos).normalized() * 10
+            out = "MOVE {x} {y} 🤚".format(x=target.pos.x + offset.x,
+                                          y=target.pos.y + offset.y)
+        elif (target != None):
             if self.pos.dist(target.pos) > 1760:
-                out = "MOVE {x} {y}".format(x=target.pos.x, y=target.pos.y)
+                out = "MOVE {x} {y} 👀".format(x=target.pos.x, y=target.pos.y)
             else:
                 if self.pos.dist(target.pos) < 900:
                     backward = (target.pos - self.pos).normalized().invert()
-                    out = "MOVE {x} {y}".format(x=backward.x, y=backward.y)
+                    out = "MOVE {x} {y} 🥾".format(x=backward.x, y=backward.y)
                 else:
                     # print(target, file=sys.stderr, flush=True)
-                    out = "BUST {id}".format(id=target.id)
+                    out = "BUST {id} 🧬".format(id=target.id)
                     if target.state == 1:
                         heat_alive.removeOne()
                         heat_lowHP.removeOne()
         else:
             targetPos = heat_lowHP.getMaxPos(
             ) if phase <= 2 else heat_alive.getMaxPos()
-            out = "MOVE {x} {y}".format(x=targetPos.x, y=targetPos.y)
+            out = "MOVE {x} {y} 🔍".format(x=targetPos.x, y=targetPos.y)
         return out
+
+    def getDeadGhost(self):
+        min_dist = None
+        ghost = None
+        for e in visible:
+            if e.type == -1 and (e.state == 0):
+                dist = e.pos.dist(self.pos)
+                if (min_dist == None or dist < min_dist) and e.pos.dist(
+                        catcher.pos) > 400 and e.pos.dist(
+                            support.pos) > 400 and dist < 4000:
+                    ghost = e
+                    min_dist = dist
+        return ghost
 
     def getOptimalGhost(self):
         min_dist = None
@@ -456,9 +480,6 @@ class HeatMap():
         return string + "\n" + str(total)
 
 
-# Phase 1 : SUPP stun HUNTER && CATCHER scout && HUNTER damage
-# Phase 2 : SUPP follow CATCHER, stun on catch && CATCHER scout && HUNTER damage
-
 phase = 1
 turn = 0
 busters_per_player = int(input())  # amount of busters you control
@@ -475,7 +496,6 @@ heat_alive = HeatMap(ghost_count, -1, -1, "alive", hunter)
 heat_dead = HeatMap(ghost_count, -1, -1, "dead", catcher)
 heat_catcher = HeatMap(ghost_count, my_team_id + 1 % 2, 1, "any", support)
 
-# game loop
 while True:
     turn += 1
     update(int(input()))
@@ -485,13 +505,11 @@ while True:
     heat_catcher.update()
 
     if (heat_alive.getTotal() <= ghost_count / 2
-            or heat_dead.getTotal() <= ghost_count / 2) and phase <= 2:
+            or heat_dead.getTotal() <= ghost_count / 2
+            or turn > 100) and phase <= 2:
         phase = 3
 
-    for e in visible:
-        if e.type != -1:
-            print(e, file=sys.stderr, flush=True)
-    print(phase, file=sys.stderr, flush=True)
+    print(phase, file=sys.stderr, flush=False)
 
     # First the HUNTER : MOVE x y | BUST id
     # Second the GHOST CATCHER: MOVE x y | TRAP id | RELEASE
