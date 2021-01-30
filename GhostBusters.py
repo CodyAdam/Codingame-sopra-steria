@@ -266,12 +266,13 @@ class Hunter(Unit):
 
 
 class HeatMap():
-    def __init__(self, number, matching_type, matching_role):
+    def __init__(self, number, matching_type, matching_role, unit):
         self.width = int(W / TILE) + 1
         self.height = int(H / TILE) + 1
         self.number = number
         self.matching_type = -1
         self.matching_role = -1
+        self.unit = unit
         self.size = self.width * self.height
         self.heat = [[float(number / self.size) for i in range(self.width)]
                      for j in range(self.height)]
@@ -284,7 +285,7 @@ class HeatMap():
 
     def getMaxPos(self):
         current_max = 0
-        blured = self.gaussBlur(self.heat, 3, 0.1)
+        blured = self.gaussBlur(self.heat, 3, 0.1, 0.4)
         max_pos = None
         for y in range(self.height):
             for x in range(self.width):
@@ -300,7 +301,7 @@ class HeatMap():
                 if self.heat[y][x] < 0:
                     self.heat[y][x] = 0
 
-    def gaussBlur(self, input, filterSize, sigma):
+    def gaussBlur(self, input, filterSize, sigma, proximity, proximityPos):
         gaussfilter = [[
             (1 / (sigma * math.sqrt(2 * math.pi))) *
             (math.exp(-((i - math.ceil(filterSize / 2))**2 +
@@ -317,15 +318,10 @@ class HeatMap():
                         cx = int(x + i - int(filterSize / 2))
                         cy = int(y + j - int(filterSize / 2))
                         if cx >= 0 and cx < self.width and cy >= 0 and cy < self.height:
-
                             out[y][x] = out[y][x] + float(
                                 gaussfilter[i][j] * input[cy][cx])
-                # print("x={x} y={y}  maxX={w}  maxY={h}".format(x=x,
-                #                                                y=y,
-                #                                                w=self.width,
-                #                                                h=self.height),
-                #       file=sys.stderr,
-                #       flush=True)
+                out[y][x] = out[y][x] + 1 / (
+                    Vec2(x, y).dist(self.unit.pos.toGrid) * proximity)
         return out
 
     def removeOne(self):
@@ -352,7 +348,7 @@ class HeatMap():
     def __str__(self):
         string = ""
         total = 0.0
-        gauss = self.gaussBlur(self.heat, 3, 0.1)
+        gauss = self.gaussBlur(self.heat, 3, 0.1, 0.4)
         for y in range(self.height):
             for x in range(self.width):
                 total += self.heat[y][x]
