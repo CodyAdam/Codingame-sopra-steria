@@ -147,6 +147,7 @@ class Entity:
 class Ghost(Entity):
     def __init__(self):
         super().__init__()
+        self.type = -1
 
     def __eq__(self, other):
         if other == None:
@@ -164,6 +165,8 @@ class Unit(Entity):
     def __init__(self, isAlly):
         super().__init__()
         self.isAlly = isAlly
+        self.type = 1 if ((isAlly and my_team_id == 1) or
+                          (not isAlly and my_team_id == 0)) else 0
         self.basePos = self.getBasePos()
         self.viewDist = 2200
 
@@ -213,7 +216,7 @@ class Support(Unit):
 
     def getTarget(self):
         for e in visible:
-            if e.type == my_team_id + 1 % 2 and e.role == 1:
+            if e.role == 1:
                 return e
 
     def update(self, pos, state, value, entity_id):
