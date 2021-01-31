@@ -310,11 +310,11 @@ class Hunter(Unit):
     def getNextMove(self):
         out = ""
         target = self.getOptimalGhost()
-        dead = self.getDeadGhost()
+        toPush = self.getPushable()
         if ((catcher.state == 2 or catcher.state == 1
-             or catcher.pos.dist(self.pos) > 4000) and dead != None):
+             or catcher.pos.dist(self.pos) > 4000) and toPush != None):
             #PUSH
-            target = dead
+            target = toPush
             offset = (target.pos - self.basePos).normalized() * 10
             out = "MOVE {x} {y} 🤚".format(x=target.pos.x + offset.x,
                                           y=target.pos.y + offset.y)
@@ -336,24 +336,16 @@ class Hunter(Unit):
             out = "MOVE {x} {y} 🔍".format(x=targetPos.x, y=targetPos.y)
         return out
 
-    def getDeadGhost(self):
+    def getPushable(self):
         min_dist = None
         ghost = None
         for e in visible:
-            if e.type == -1 and (e.state == 0):
-                dist = e.pos.dist(self.pos)
-                if (min_dist == None or dist < min_dist) and self.pos.dist(
-                        support.pos) > 2000 and dist < 4000:
-                    ghost = e
-                    min_dist = dist
-        if ghost == None:
-            for e in visible:
-                if e.type == -1:
-                    dist = e.pos.dist(self.pos)
-                    if (min_dist == None or dist < min_dist) and self.pos.dist(
-                            support.pos) > 2000 and dist < 4000:
-                        ghost = e
-                        min_dist = dist
+            if e.type == -1 and (e.state == 0) and (
+                    min_dist == None
+                    or e.pos.dist(self.pos) < min_dist) and self.pos.dist(
+                        support.pos) > 2000 and e.pos.dist(self.pos) < 4000:
+                ghost = e
+                min_dist = e.pos.dist(self.pos)
         return ghost
 
     def getOptimalGhost(self):
