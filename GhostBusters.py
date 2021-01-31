@@ -216,8 +216,9 @@ class Support(Unit):
 
     def hasGhostNear(self, target):
         for e in visible:
-            if e.type == -1 and e.pos.dist(target.pos) <= 1760 and (
+            if e.type == -1 and e.pos.dist(target.pos) <= 2000 and (
                     e.state == 0 or (e.value != 0 and e.state <= 3)):
+                print(e, file=sys.stderr, flush=False)
                 return True
         return False
 
