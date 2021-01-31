@@ -313,7 +313,6 @@ class Hunter(Unit):
                     backward = (target.pos - self.pos).normalized().invert()
                     out = "MOVE {x} {y} 🥾".format(x=backward.x, y=backward.y)
                 else:
-                    # print(target, file=sys.stderr, flush=True)
                     out = "BUST {id} 🧬".format(id=target.id)
                     if target.state == 1:
                         heat_alive.removeOne()
