@@ -342,11 +342,18 @@ class Hunter(Unit):
         for e in visible:
             if e.type == -1 and (e.state == 0):
                 dist = e.pos.dist(self.pos)
-                if (min_dist == None or dist < min_dist) and e.pos.dist(
-                        catcher.pos) > 400 and e.pos.dist(
-                            support.pos) > 400 and dist < 4000:
+                if (min_dist == None or dist < min_dist) and self.pos.dist(
+                        support.pos) > 2000 and dist < 4000:
                     ghost = e
                     min_dist = dist
+        if ghost == None:
+            for e in visible:
+                if e.type == -1:
+                    dist = e.pos.dist(self.pos)
+                    if (min_dist == None or dist < min_dist) and self.pos.dist(
+                            support.pos) > 2000 and dist < 4000:
+                        ghost = e
+                        min_dist = dist
         return ghost
 
     def getOptimalGhost(self):
