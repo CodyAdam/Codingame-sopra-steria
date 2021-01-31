@@ -188,26 +188,38 @@ class Support(Unit):
         out = ""
         target = self.getTarget()
         if (target != None):
-            if self.pos.dist(
-                    target.pos
-            ) > 1760 or self.cooldown > 0 or target.state == 0:
-                close = self.getCloseDead()
-                if close != None:
-                    offset = (close.pos - self.basePos).normalized() * 10
-                    out = "MOVE {x} {y} 🤚".format(x=close.pos.x + offset.x,
-                                                  y=close.pos.y + offset.y)
+            if self.pos.dist(target.pos) < 1760:
+                if self.cooldown <= 0 and (self.hasGhostNear(target)
+                                           or target.state != 0):
+                    out = "STUN {id} STUN".format(id=target.id)
+                    self.cooldown = 20
                 else:
-                    out = "MOVE {x} {y} 🔫{cd}".format(
-                        x=target.pos.x,
-                        y=target.pos.y,
-                        cd=(self.cooldown if self.cooldown > 0 else ""))
+                    close = self.getCloseDead()
+                    if close != None:
+                        offset = (close.pos - self.basePos).normalized() * 10
+                        out = "MOVE {x} {y} 🤚".format(x=close.pos.x + offset.x,
+                                                      y=close.pos.y + offset.y)
+                    else:
+                        out = "MOVE {x} {y} 🔫{cd}".format(
+                            x=target.pos.x,
+                            y=target.pos.y,
+                            cd=(self.cooldown if self.cooldown > 0 else ""))
             else:
-                out = "STUN {id} STUN".format(id=target.id)
-                self.cooldown = 20
+                out = "MOVE {x} {y} 🔫{cd}".format(
+                    x=target.pos.x,
+                    y=target.pos.y,
+                    cd=(self.cooldown if self.cooldown > 0 else ""))
         else:
             targetPos = heat_catcher.getMaxPos()
             out = "MOVE {x} {y} 🔍".format(x=targetPos.x, y=targetPos.y)
         return out
+
+    def hasGhostNear(self, target):
+        for e in visible:
+            if e.type == -1 and e.pos.dist(target.pos) <= 1760 and (
+                    e.state == 0 or (e.value != 0 and e.state <= 3)):
+                return True
+        return False
 
     def getCloseDead(self):
         for e in visible:
