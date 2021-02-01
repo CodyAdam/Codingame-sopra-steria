@@ -1,5 +1,5 @@
-# My rank : 35/168
-# [Final Ranking](https://www.codingame.com/hackathon/sopra-steria-coding-challenge/leaderboard/global)
+# My rank : 35/168 [Leaderboard](https://www.codingame.com/hackathon/sopra-steria-coding-challenge/leaderboard/global)
+# 
 
 # Coding-Games-sopra-steria
 
