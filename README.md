@@ -3,7 +3,8 @@
 
 Sopra Steria vous lance un défi de 10 jours, sous forme d’un hackathon en France uniquement. Le concours débute le 21 Janvier à 18h00 et finit le 31 janvier à 23h59.
 
-# My rank : 35/168 [Leaderboard](https://www.codingame.com/hackathon/sopra-steria-coding-challenge/leaderboard/global)
+# Me : rank 35/168 [Leaderboard](https://www.codingame.com/hackathon/sopra-steria-coding-challenge/leaderboard/global)
+For the event I used python3.
 
 ![leaderboard](leaderboard.gif)
 
