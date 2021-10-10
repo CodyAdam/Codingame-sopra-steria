@@ -1,5 +1,5 @@
 
-# Coding-Games-sopra-steria
+# About
 Hackathon by Sopra Steria. A duration of 10 day. The goal is to create the best AI to fight in a 1v1 against other players.
 
 Sopra Steria vous lance un défi de 10 jours, sous forme d’un hackathon en France uniquement. Le concours débute le 21 Janvier à 18h00 et finit le 31 janvier à 23h59.
